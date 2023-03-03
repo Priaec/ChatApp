@@ -67,7 +67,7 @@ function client(){
             id: socket.id,
             ip: ip.address(),
             userName: userName,
-            port: socket.conn.remoteAddress
+            port: ""
         });
         socket.on('broadcast', (data)=>{
             console.log('%s:%s', data.sender, data.msg);
