@@ -59,7 +59,7 @@ function client(){
     //connecting to server
     console.log("Connecting to the server...");
     //when client has connected to server socket, welcome them in chat room
-    socket.on("connect", (port) => {
+    socket.on("connect", () => {
         userName = process.argv[3];
         console.log("[User]: Welcome %s", userName);
         //send ip address to the server
@@ -67,7 +67,7 @@ function client(){
             id: socket.id,
             ip: ip.address(),
             userName: userName,
-            port: port
+            port: socket.conn.remoteAddress
         });
         socket.on('broadcast', (data)=>{
             console.log('%s:%s', data.sender, data.msg);
@@ -76,6 +76,7 @@ function client(){
         socket.on('list', (data)=>{
             users = data;
         });
+
     });
 
     //when the client is disconnected from the server, notify the user and specify reason
@@ -127,7 +128,17 @@ function client(){
                 console.log((i + 1) + ': '+ item.ip + ' | Port#: ' + port);
             });
         }
+        if(input.startsWith('--connect')){
+
+        }
     });
+}
+
+//regex for checking ip address
+function isIP(input){
+    if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(input))
+        return (true)    
+    return (false)  
 }
 
 //main
