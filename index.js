@@ -13,13 +13,10 @@ function server() {
     console.log("A client connected");
     //when connection is made for the first time
     socket.on("connection", (data) => {
-      connections.push(data);
-      console.log(
-        "User connected on port:",
-        socket.request.connection.remotePort
-      ); // log the remote port number of the user
-      console.log(connections);
-      io.sockets.emit("list", connections);
+        data.port = socket.request.connection.remotePort;
+        connections.push(data);
+        console.log(connections);
+        io.sockets.emit("list", connections);
     });
 
     //when a user disconnects, display the reason why to the server
@@ -63,6 +60,8 @@ function client() {
   //users name
   let userName = null;
   let users = [];
+  //current User
+  let user = {};
   //connecting to server
   console.log("Connecting to the server...");
   //when client has connected to server socket, welcome them in chat room
@@ -70,18 +69,19 @@ function client() {
     userName = process.argv[3];
     console.log("[User]: Welcome %s", userName);
     //send ip address to the server
-    socket.emit("connection", {
-      id: socket.id,
-      ip: ip.address(),
-      userName: userName,
-      port: socket.conn.remoteAddress,
-    });
+    user = {
+        id: socket.id,
+        ip: ip.address(),
+        userName: userName,
+        port: ""
+    }
+    socket.emit("connection", user);
     socket.on("broadcast", (data) => {
       console.log("%s:%s", data.sender, data.msg);
     });
-    //when i recieve code 'list'
+    //when i receive code 'list'
     socket.on("list", (data) => {
-      users = data;
+        users = data;
     });
   });
 
@@ -117,15 +117,24 @@ function client() {
     //user types help command
     if (input.startsWith("--help")) displayHelpDoc();
     //user wants to know the port connection
-    if (input.startsWith("--myport")) console.log("Server Port: " + port);
+    if (input.startsWith("--myport")){
+        const id = getUser(userName, users);
+        const userPort = getPort(id, users);
+        console.log("Port: " + userPort);
+    }
     //user wants to know their ip address
     if (input.startsWith("--myip")) console.log("IP Addr: " + ip.address());
     //list of all connected users in the chat
     if (input.startsWith("--list")) {
       console.log("id: IP address      Port No.");
       //display all of the other clients
+      rl.on("line", (input2)=>{
+        if(input2.startsWith('terminate')){
+            
+        }
+      });
       users.forEach((item, i) => {
-        console.log(i + 1 + ": " + item.ip + " | Port#: " + port);
+        console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port);
       });
     }
     if (input.startsWith("--connect")) {
@@ -142,6 +151,32 @@ function isIP(input) {
   )
     return true;
   return false;
+}
+
+//socket lookups
+
+//returns id of user
+function getUser(name, users){
+    for(let i = 0; i < users.length; i++){
+        if(name == users[i].userName)
+            return users[i].id;
+    }
+    return "";
+}
+
+
+//returns port of user, give id to it
+function getPort(id, users){
+    for(let i = 0; i < users.length; i++){
+        if(id == users[i].id)
+            return users[i].port;
+    }
+    return "";
+}
+
+//
+function terminateConn(){
+
 }
 
 //main
