@@ -1,6 +1,7 @@
 /*** client.js ***/
+const port = process.argv[3] || 3000;
 const io = require("socket.io-client");
-const socket = io("http://localhost:3000");
+const socket = io("http://localhost:" + port);
 const readline = require('readline');
 let nickname = null;
 console.log("Connecting to the server...");
