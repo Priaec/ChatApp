@@ -86,8 +86,7 @@ function server() {
       });
     });
 
-
-    socket.on("terminate", (data)=>{
+    socket.on("terminate", (data, callback)=>{
       //data has two arguments, id of the user, and id of the desired termination socket
       //id: user.id,
       const roomName = data.destId;
@@ -101,11 +100,20 @@ function server() {
             io.sockets.sockets.get(socketId).leave(roomName);
         });
       }*/
-      console.log({rooms: io.sockets.adapter.rooms});
+      //console.log({rooms: io.sockets.adapter.rooms});
+      io.to(data.destId).emit('leave-room', {userID: data.id});
+      callback({
+        status: 'ok'
+      })
     });
     //join a specific room
-    socket.on("joinroom", (data)=>{
+    socket.on("joinRoom", (data, callback)=>{
       socket.join(data);
+      //pass the room back form storage
+      callback({
+        status: 'ok',
+        room: data
+      })
     })
   });
 }
@@ -148,6 +156,8 @@ function client() {
   let destination = "";
   //log previous command
   let prev = "";
+  //room we are currently connected in, if '', that means we are not connected to anyone in particular
+  let room = '';
   //connecting to server
   console.log("Connecting to the server...");
   //when client has connected to server socket, welcome them in chat room
@@ -190,6 +200,11 @@ function client() {
     console.log(userName + ": " + msg);
   })
 
+  //when user leaves or terminates connection, send this to peer B
+  socket.on('leave-room', ({userID})=>{
+    console.log(userID + ' disconnected from you');
+  });
+
   //when the client is disconnected from the server, notify the user and specify reason
   socket.on("disconnect", (reason) => {
     console.log("[INFO]: Client disconnected, reason: %s", reason);
@@ -223,6 +238,9 @@ function client() {
     }
     //final version of chat message
     if(input.startsWith('send')){
+      if(room == ''){
+        return console.log('Must be connected to someone to send message to them only');
+      }
       //get the id of the user we want to send to
       const destIndex = parseInt(args[1]);
       //lookup destination object given the id
@@ -232,6 +250,7 @@ function client() {
         const msg = args.filter((val, index)=>{
           return index >= 2;
         });
+        //reformat the message into one string
         let readyMsg = ' ';
         msg.forEach((word)=>{
           readyMsg += (word + ' ');
@@ -241,16 +260,6 @@ function client() {
           msg: readyMsg,
           userName: user.userName
         });
-        //send message to that room only
-        
-        /*socket.emit("broadcast", {
-          sender: userName,
-          action: "broadcast",
-          msg: readyMsg,
-          address: ip.address(),
-        }, destUser.id);
-        
-        */
     }
 
     //user wants their information of their socket
@@ -307,10 +316,22 @@ function client() {
       socket.emit('joinRoom', {
         roomName: user.id,
         peerId: destId
+      },
+      (response)=>{
+        //we we connected to a room
+        if(response.status == 'ok'){
+          //set connected room to variable
+          room = response.room;
+          console.log('Connected with: ' + response.room);
+        }
       });
 
     }
     if(input.startsWith('--terminate')){
+      //if you have not made a connection to someone, return, you dont need to do anything here
+      if(room == '')
+        return console.log('No one way connection exists');
+      //we know we are connected to someone at the moment
       let terminateUser = {};
       //args[1] = connection id
       //if the user used --list command before this one
@@ -328,6 +349,12 @@ function client() {
       socket.emit('terminate', {
         id: user.id,
         destId: terminateUser.id
+      },(response)=>{
+        //if we get an okay message, we disconnected from the room, set room variable to nothing
+        if(response.status == 'ok'){
+          room = '';
+          console.log('Disconnected from user');
+        }
       });
       destination = "";
     }
