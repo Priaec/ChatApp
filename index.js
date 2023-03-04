@@ -11,7 +11,7 @@ function server() {
   let connections = [];
   //server controller
   io.of("/").on("connect", async(socket) => {
-    console.log({rooms: io.sockets.adapter.rooms});
+    //console.log({rooms: io.sockets.adapter.rooms});
     console.log("A client connected");
     //when connection is made for the first time
     socket.on("connection", (data) => {
@@ -58,6 +58,7 @@ function server() {
     });
 
     //chat in private room response
+    //roomName: destination ID (peer B)
     socket.on('chat-msg', ({roomName, msg, userName}) =>{
       console.log({roomName: roomName, msg: msg, userName: userName});
       io.to(roomName).emit('chat-msg', {msg, userName});
@@ -92,19 +93,11 @@ function server() {
       const roomName = data.destId;
       //destId: terminateUser.id
       socket.leave(data.destId);
-      /*const socketsInRoom = io.sockets.adapter.rooms.get(roomName);
-      if(socketsInRoom){
-        //remove every socket from this room
-        socketsInRoom.forEach((socketId)=>{
-          if(socketId != data.id)
-            io.sockets.sockets.get(socketId).leave(roomName);
-        });
-      }*/
       //console.log({rooms: io.sockets.adapter.rooms});
       io.to(data.destId).emit('leave-room', {userID: data.id});
       callback({
         status: 'ok'
-      })
+      });
     });
     //join a specific room
     socket.on("joinRoom", (data, callback)=>{
@@ -114,7 +107,7 @@ function server() {
         status: 'ok',
         room: data
       })
-    })
+    });
   });
 }
 
@@ -193,11 +186,18 @@ function client() {
   //once connected with someone, peer B recieves this message
   socket.on('addedToRoom', (roomName)=>{
     console.log('You are now connected with: ' + roomName);
+    console.log('Connect back with them to respond to them, if you have not already!');
   });
 
   //once chat has been sent to room, notify peers
   socket.on('chat-msg' ,({msg, userName})=>{
-    console.log(userName + ": " + msg);
+    //get the information regarding that user
+    const sender = getUserObj(userName, users);
+    console.log('\nMessage recieved from ' + sender.ip);
+    console.log("Sender's Port: " + sender.port);
+    console.log('Message: "' + msg + '"\n');
+    //we have id, we need port and ip
+    //console.log(userName + ": " + msg);
   })
 
   //when user leaves or terminates connection, send this to peer B
@@ -305,11 +305,13 @@ function client() {
       //find destination id from given port and ip address combination
       const destId = getID(args[1],args[2],users);
       if(destId == "")
-        return console.log('Port not in use')
+        return console.log('Ip Address and/or Port not in use')
+      //check if its me
+      if(destId == user.id)
+        return console.log({error: 'Connection to oneself, aborted'});
       //find the id of the user based off the ip address and port #
       console.log('connecting to user...');
       //set the destination socket id as a global to connect via a room
-      /*****destination = destId;*****/
       //create room with current user and the specified user
       prev = '--connect';
       // Peer A asks server to establish connection between peer A and B
@@ -321,11 +323,10 @@ function client() {
         //we we connected to a room
         if(response.status == 'ok'){
           //set connected room to variable
-          room = response.room;
-          console.log('Connected with: ' + response.room);
+          room = response.room.peerId;
+          console.log({success: 'Connected with socket (id): ' + room});
         }
       });
-
     }
     if(input.startsWith('--terminate')){
       //if you have not made a connection to someone, return, you dont need to do anything here
@@ -333,7 +334,6 @@ function client() {
         return console.log('No one way connection exists');
       //we know we are connected to someone at the moment
       let terminateUser = {};
-      //args[1] = connection id
       //if the user used --list command before this one
       if(prev != '--list')
         return console.log('Invalid input, try command --list before using --terminate');
@@ -357,6 +357,24 @@ function client() {
         }
       });
       destination = "";
+    }
+    //when ar user exits
+    if(input.startsWith('exit')){
+      //terminate connection with room
+      console.log(room);
+      //if no room, then just exit
+      if(room != ''){
+        socket.emit('terminate',{
+          id: user.id,
+          destId: room
+        },(response)=>{
+          if(response.status == 'ok')
+            console.log('Disconnected from connected user!');  
+        });
+      }
+      console.log('Terminating Process');
+      //exit the process
+      process.exit();
     }
   });
 }
@@ -401,17 +419,22 @@ function getPort(id, users){
     return "";
 }
 
-/*function getIDFromPort(port,users){
-  for(let i = 0; i < users.length; i++){
-      if(port == users[i].port)
-        return users[i].id
+//gets the whole user object back, give it the name and the set of users to look through
+function getUserObj(name, users){
+  for(let i=0; i < users.length; i++){
+    if(name == users[i].userName)
+      return users[i];
   }
   return "";
-}*/
+}
 
-//
-function terminateConn(){
-
+//check if the person is still connected into the main room
+function isUserConnected(id, users){
+  for(let i=0;i<users.length;i++){
+    if(users[i].id == id)
+      return true;
+  }
+  return false;
 }
 
 //main
