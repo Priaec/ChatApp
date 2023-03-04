@@ -9,7 +9,7 @@ function server() {
   //list of socket objects, each object has id, ip, port, nickname
   let connections = [];
   //server controller
-  io.of("/").on("connect", (socket) => {
+  io.of("/").on("connect", async(socket) => {
     console.log("A client connected");
     //when connection is made for the first time
     socket.on("connection", (data) => {
@@ -38,6 +38,11 @@ function server() {
       console.log("\n%s", data);
       socket.broadcast.emit("broadcast", data);
     });
+
+    //join a specific room
+    socket.on("joinroom", (data)=>{
+      socket.join(data);
+    })
   });
 }
 
@@ -105,6 +110,7 @@ function client() {
 
   //cmd line controller
   rl.on("line", (input) => {
+    const args = input.split(' ');
     if (true === input.startsWith("chat")) {
       let str = input.slice(4);
       socket.emit("broadcast", {
@@ -128,16 +134,24 @@ function client() {
     if (input.startsWith("--list")) {
       console.log("id: IP address      Port No.");
       //display all of the other clients
-      rl.on("line", (input2)=>{
-        if(input2.startsWith('terminate')){
-            
-        }
-      });
       users.forEach((item, i) => {
         console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port);
       });
     }
     if (input.startsWith("--connect")) {
+      console.log(args[2]); 
+      if(!isIP()){
+        return;
+      }
+        
+      //take arguments from command line
+      //console.log(input);
+      //check the index of the user
+      const destId = getIDFromPort(args[2],users);
+      //find the id of the user based off the ip address and port #
+      console.log(destId)
+      //create room with current user and the specified user
+      joinRoom(destId);
     }
   });
 }
@@ -174,8 +188,21 @@ function getPort(id, users){
     return "";
 }
 
+function getIDFromPort(port,users){
+  for(let i = 0; i < users.length; i++){
+      if(port == users[i].port)
+        return users[i].id
+  }
+  return "";
+}
+
 //
 function terminateConn(){
+
+}
+
+//creates new connection with user, gives id of dest user
+function joinRoom(destId){
 
 }
 
