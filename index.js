@@ -34,9 +34,13 @@ function server() {
       );
     });
     //when a user sends a message, emit it to all clients
-    socket.on("broadcast", (data) => {
+    socket.on("broadcast", (data, room) => {
       console.log("\n%s", data);
-      socket.broadcast.emit("broadcast", data);
+      if(room === ''){
+        socket.broadcast.emit("broadcast", data);
+      }else{
+        socket.to(room).emit("broadcast", data);
+      }  
     });
 
     //join a specific room
@@ -68,6 +72,8 @@ function client() {
   //current User
   let user = {};
   let flag = 0;
+  //destination socket (ID of socket)
+  let destination = "";
   //connecting to server
   console.log("Connecting to the server...");
   //when client has connected to server socket, welcome them in chat room
@@ -128,7 +134,7 @@ function client() {
         action: "broadcast",
         msg: str,
         address: ip.address(),
-      });
+      }, destination);
     }
     //user types help command
     if (input.startsWith("--help")) displayHelpDoc();
@@ -158,9 +164,10 @@ function client() {
       if(destId == "")
         return console.log('Port not in use')
       //find the id of the user based off the ip address and port #
-      console.log(destId)
+      console.log('connecting to user...');
+      //set the destination socket id as a global to connect via a room
+      destination = destId;
       //create room with current user and the specified user
-      joinRoom(destId);
     }
   });
 }
