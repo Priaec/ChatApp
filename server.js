@@ -30,4 +30,16 @@ io.of("/").on("connect", (socket) => {
     console.log("\n%s", data);
     socket.broadcast.emit("broadcast", data);
   });
+  socket.on("terminate", (id) => {
+    console.log("[INFO]: Terminate request received for user - %s", id);
+    const index = connections.findIndex((user) => user.id === id);
+    if (index !== -1) {
+      const userName = connections[index].userName;
+      connections.splice(index, 1);
+      io.emit("list", connections);
+      console.log("[INFO]: User %s (%s) terminated", userName, id);
+    } else {
+      console.log("[INFO]: User not found - %s", id);
+    }
+  });
 });
