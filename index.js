@@ -67,6 +67,7 @@ function client() {
   let users = [];
   //current User
   let user = {};
+  let flag = 0;
   //connecting to server
   console.log("Connecting to the server...");
   //when client has connected to server socket, welcome them in chat room
@@ -86,7 +87,16 @@ function client() {
     });
     //when i receive code 'list'
     socket.on("list", (data) => {
+      //reupdate list of users when new socket is connected into server
         users = data;
+        if(flag <= 0){
+          //set current port num the user.port field
+          const id = getUser(userName, users);
+          const userPort = getPort(id, users);
+          user.port = userPort;
+        }
+        //set the port field of current user
+        flag++;
     });
   });
 
@@ -139,15 +149,14 @@ function client() {
       });
     }
     if (input.startsWith("--connect")) {
-      console.log(args[2]); 
-      if(!isIP()){
-        return;
-      }
-        
-      //take arguments from command line
-      //console.log(input);
-      //check the index of the user
-      const destId = getIDFromPort(args[2],users);
+      console.log(args[1]);
+      //check if IP address is valid 
+      if(!isIP(args[1]))
+        return console.log('Invalid IP');
+      //find destination id from given port and ip address combination
+      const destId = getID(args[1],args[2],users);
+      if(destId == "")
+        return console.log('Port not in use')
       //find the id of the user based off the ip address and port #
       console.log(destId)
       //create room with current user and the specified user
@@ -178,6 +187,14 @@ function getUser(name, users){
     return "";
 }
 
+//specify port and ip address, will locate the id of that user
+function getID(ip, port,users){
+  for(let i=0;i<users.length;i++){
+    if(ip == users[i].ip && port == users[i].port)
+      return users[i].id
+  }
+  return "";
+}
 
 //returns port of user, give id to it
 function getPort(id, users){
@@ -188,13 +205,13 @@ function getPort(id, users){
     return "";
 }
 
-function getIDFromPort(port,users){
+/*function getIDFromPort(port,users){
   for(let i = 0; i < users.length; i++){
       if(port == users[i].port)
         return users[i].id
   }
   return "";
-}
+}*/
 
 //
 function terminateConn(){
