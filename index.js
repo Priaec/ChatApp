@@ -50,9 +50,26 @@ function server() {
     });
 
     //when a new connection is created
-    socket.on('new-room',(data)=>{
+    socket.on('new-room',(data, callback)=>{
       socket.join(data.roomName);
+      callback({
+        status: 'ok'
+      })
     });
+
+    //chat in private room response
+    socket.on('chat-msg', ({roomName, msg, userName}) =>{
+      console.log({roomName: roomName, msg: msg, userName: userName});
+      io.to(roomName).emit('chat-msg', {msg, userName});
+    });
+
+    // Server listens for the 'joinRoom' event
+    socket.on('joinRoom', ({ roomName, peerId }) => {
+      socket.join(roomName);
+      // You can also emit a message to the other peer (peer B) to let them know that they've been added to the room
+      io.to(peerId).emit('addedToRoom', roomName);
+    });
+
 
     //check if there is a connection with socket and destination id
     socket.on('checkIfConnection', (data, callback)=>{
@@ -163,6 +180,16 @@ function client() {
     });
   });
 
+  //once connected with someone, peer B recieves this message
+  socket.on('addedToRoom', (roomName)=>{
+    console.log('You are now connected with: ' + roomName);
+  });
+
+  //once chat has been sent to room, notify peers
+  socket.on('chat-msg' ,({msg, userName})=>{
+    console.log(userName + ": " + msg);
+  })
+
   //when the client is disconnected from the server, notify the user and specify reason
   socket.on("disconnect", (reason) => {
     console.log("[INFO]: Client disconnected, reason: %s", reason);
@@ -201,29 +228,29 @@ function client() {
       //lookup destination object given the id
       const destUser = users[destIndex - 1];
       //check if we made a room with this person
-      socket.emit('checkIfConnection', {
-        id: user.id,
-        destId: destUser.id
-      }, (response)=>{
-        //if there is a connection 
-        if(!response.response)
-          return console.log('Connection has not been established, please establish connection with socket first');
         //there has to be a connection by this point
         const msg = args.filter((val, index)=>{
           return index >= 2;
         });
-        let readyMsg = '';
+        let readyMsg = ' ';
         msg.forEach((word)=>{
           readyMsg += (word + ' ');
         })
+        socket.emit('chat-msg', {
+          roomName: destUser.id,
+          msg: readyMsg,
+          userName: user.userName
+        });
         //send message to that room only
-        socket.emit("broadcast", {
+        
+        /*socket.emit("broadcast", {
           sender: userName,
           action: "broadcast",
           msg: readyMsg,
           address: ip.address(),
         }, destUser.id);
-      });
+        
+        */
     }
 
     //user wants their information of their socket
@@ -276,9 +303,12 @@ function client() {
       /*****destination = destId;*****/
       //create room with current user and the specified user
       prev = '--connect';
-      socket.emit('new-room', {
-        roomName: destId
+      // Peer A asks server to establish connection between peer A and B
+      socket.emit('joinRoom', {
+        roomName: user.id,
+        peerId: destId
       });
+
     }
     if(input.startsWith('--terminate')){
       let terminateUser = {};
