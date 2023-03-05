@@ -42,7 +42,8 @@ function server() {
     });
     //when a user sends a message, emit it to all clients
     socket.on("broadcast", (data, room) => {
-      console.log("\n%s%s", data, room);
+      console.log({broadcast: data, room: room});
+      //console.log("\n%s%s", data, room);
       if(room === '')
         socket.broadcast.emit("broadcast", data);
       else
@@ -129,7 +130,8 @@ function client() {
   //socket.io library
   const io = require("socket.io-client");
   //create destination pointer
-  const socket = io("http://localhost:" + port);
+  const socket = io('http://'+ip.address()+':'+ port);
+  //const socket = io("http://localhost:" + port);
   //cmd line library
   const readline = require("readline");
   //read file for help and documentation on CMD
@@ -185,8 +187,13 @@ function client() {
 
   //once connected with someone, peer B recieves this message
   socket.on('addedToRoom', (roomName)=>{
-    console.log('You are now connected with: ' + roomName);
-    console.log('Connect back with them to respond to them, if you have not already!');
+    //if the person that you are connected with is now connected to you, too, mention two way connection established
+    if(roomName == room)
+      console.log('Established 2 way connection with: ' + roomName);
+    else{
+      console.log('You are now connected with: ' + roomName);
+      console.log('Connect back with them to respond to them, if you have not already!');
+    }
   });
 
   //once chat has been sent to room, notify peers
@@ -292,6 +299,8 @@ function client() {
       users.forEach((item, i) => {
         if(item.id == user.id)
           console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port + " | userName: " + item.userName + ' (ME)');
+        else if(item.id == room)
+          console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port + " | userName: " + item.userName + ' (Connected To)');
         else
           console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port + " | userName: " + item.userName);
       });
@@ -309,6 +318,8 @@ function client() {
       //check if its me
       if(destId == user.id)
         return console.log({error: 'Connection to oneself, aborted'});
+      if(room != '')
+        return console.log({error: 'You must terminate connection with user before connecting to new user'});
       //find the id of the user based off the ip address and port #
       console.log('connecting to user...');
       //set the destination socket id as a global to connect via a room
