@@ -89,16 +89,24 @@ function server() {
     socket.on('terminate', (data, callback)=>{
       //data has two arguments, id of the user, and id of the desired termination socket
       //id: user.id,
-      const roomName = data.destId;
+      //const roomName = data.destId;
       //destId: terminateUser.id
-      socket.leave(data.destId);
+      //socket.leave(data.destId);
       //console.log({rooms: io.sockets.adapter.rooms});
-      io.to(data.destId).emit('leave-room', {userID: data.id});
+      //io.to(data.destId).emit('leave-room', {userID: data.id});
+      //loop thru each room, and leave it, also mention to all peers you disconnected with emit: 'leave-room' 
+      console.log({userID :data.id});
+      data.rooms.forEach((room)=>{
+        //console.log({room: room});
+        socket.leave(room);
+        io.to(room).emit('leave-room',{person: data.id})
+      });
       callback({
         status: 'ok',
-        roomName: roomName
+        roomName: data.rooms[0]
       });
     });
+
     //join a specific room
     socket.on("joinRoom", (data, callback)=>{
       socket.join(data);
@@ -188,7 +196,7 @@ function client() {
   //once connected with someone, peer B recieves this message
   socket.on('addedToRoom', (roomName)=>{
     //if the person that you are connected with is now connected to you, too, mention two way connection established
-    if(roomName == room)
+    if(isInRoomList(roomName, rooms))
       console.log('Established 2 way connection with: ' + roomName);
     else{
       console.log('You are now connected with: ' + roomName);
@@ -207,10 +215,11 @@ function client() {
   })
 
   //when user leaves or terminates connection, send this to peer B
-  socket.on('leave-room', ({userID})=>{
-    console.log(userID + ' disconnected from you');
+  socket.on('leave-room', (data)=>{
+    //console.log(data);
+    console.log(data.person + ' disconnected from you');
     //remove userID from the set of rooms
-    rooms = removeRoom(userID, rooms);
+    rooms = removeRoom(data.person, rooms);
   });
 
   //when the client is disconnected from the server, notify the user and specify reason
@@ -297,6 +306,7 @@ function client() {
     }
     //list of all connected users in the chat
     if (input.startsWith("--list")) {
+      console.log('Clients on platform: ' + users.length);
       console.log("id: IP address      Port No.       UserName");
       //display all of the other clients
       users.forEach((item, i) => {
@@ -308,6 +318,7 @@ function client() {
         else
           console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port + " | userName: " + item.userName);
       });
+      console.log('Clients connected with privately: ' + rooms.length);
       prev = "--list";
     }
     if (input.startsWith("--connect")) {
@@ -368,7 +379,8 @@ function client() {
       //all inputs are valid, terminate connection with user
       socket.emit('terminate', {
         id: user.id,
-        destId: terminateUser.id
+        rooms: [terminateUser.id]
+        //destId: terminateUser.id
       },(response)=>{
         //if we get an okay message, we disconnected from the room, set room variable to nothing
         if(response.status != 'ok')
@@ -382,12 +394,12 @@ function client() {
     //when ar user exits
     if(input.startsWith('exit')){
       //terminate connection with room
-      console.log(room);
+      //console.log(room);
       //if no room, then just exit
-      if(room != ''){
+      if(rooms.length > 1){
         socket.emit('terminate',{
           id: user.id,
-          destId: room
+          rooms: rooms,
         },(response)=>{
           if(response.status != 'ok')
             return console.log({error: 'Could not disconnect the connection'});  
