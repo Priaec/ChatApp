@@ -125,6 +125,7 @@ function nameExists(name, users){
 function client() {
   /*** client.js ***/
   //define variables
+  const ip = require("ip");
   console.log(process.argv[4]);
   const port = process.argv[4] || 3000;
   //socket.io library
@@ -137,7 +138,6 @@ function client() {
   //read file for help and documentation on CMD
   const fs = require("fs");
   //library to get IP address of client
-  const ip = require("ip");
   const { listeners } = require("process");
   //users name
   let userName = null;
