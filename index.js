@@ -1,6 +1,4 @@
-//const { connect } = require("http2");
 function server() {
-  /*** server.js ***/
   //define variables
   const port = process.argv[3] || 3000;
   //socket.io library
@@ -88,7 +86,7 @@ function server() {
       });
     });
 
-    socket.on("terminate", (data, callback)=>{
+    socket.on('terminate', (data, callback)=>{
       //data has two arguments, id of the user, and id of the desired termination socket
       //id: user.id,
       const roomName = data.destId;
@@ -97,7 +95,8 @@ function server() {
       //console.log({rooms: io.sockets.adapter.rooms});
       io.to(data.destId).emit('leave-room', {userID: data.id});
       callback({
-        status: 'ok'
+        status: 'ok',
+        roomName: roomName
       });
     });
     //join a specific room
@@ -123,22 +122,21 @@ function nameExists(name, users){
 }
 
 function client() {
-  /*** client.js ***/
   //define variables
+  //library to get IP address of client
   const ip = require("ip");
   console.log(process.argv[4]);
   const port = process.argv[4] || 3000;
   //socket.io library
   const io = require("socket.io-client");
   //create destination pointer
-  const socket = io('http://'+ip.address()+':'+ port);
-  //const socket = io("http://localhost:" + port);
+  //const socket = io('http://'+ip.address()+':'+ port);
+  const socket = io("http://localhost:" + port);
   //cmd line library
   const readline = require("readline");
   //read file for help and documentation on CMD
   const fs = require("fs");
-  //library to get IP address of client
-  const { listeners } = require("process");
+  //const { listeners } = require("process");
   //users name
   let userName = null;
   //list of all users that are joined in the chat room
@@ -153,6 +151,8 @@ function client() {
   let prev = "";
   //room we are currently connected in, if '', that means we are not connected to anyone in particular
   let room = '';
+  //set of rooms user is connected in
+  let rooms = [];
   //connecting to server
   console.log("Connecting to the server...");
   //when client has connected to server socket, welcome them in chat room
@@ -203,13 +203,14 @@ function client() {
     console.log('\nMessage recieved from ' + sender.ip);
     console.log("Sender's Port: " + sender.port);
     console.log('Message: "' + msg + '"\n');
-    //we have id, we need port and ip
-    //console.log(userName + ": " + msg);
+    console.log('Type: private message')
   })
 
   //when user leaves or terminates connection, send this to peer B
   socket.on('leave-room', ({userID})=>{
     console.log(userID + ' disconnected from you');
+    //remove userID from the set of rooms
+    rooms = removeRoom(userID, rooms);
   });
 
   //when the client is disconnected from the server, notify the user and specify reason
@@ -245,13 +246,15 @@ function client() {
     }
     //final version of chat message
     if(input.startsWith('send')){
-      if(room == ''){
+      if(rooms.length < 1)
         return console.log('Must be connected to someone to send message to them only');
-      }
       //get the id of the user we want to send to
       const destIndex = parseInt(args[1]);
       //lookup destination object given the id
       const destUser = users[destIndex - 1];
+      //check if the destination socket is not in our list
+      if(!isInRoomList(destUser.id, rooms))
+        return console.log({error: 'You are disconnected with this person, you must reconnect with them to privately send messages to them.'});
       //check if we made a room with this person
         //there has to be a connection by this point
         const msg = args.filter((val, index)=>{
@@ -299,15 +302,15 @@ function client() {
       users.forEach((item, i) => {
         if(item.id == user.id)
           console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port + " | userName: " + item.userName + ' (ME)');
-        else if(item.id == room)
-          console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port + " | userName: " + item.userName + ' (Connected To)');
+        //does user have connection with this socket
+        else if(isInRoomList(item.id, rooms))
+          console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port + " | userName: " + item.userName + ' (Connected)');
         else
           console.log(i + 1 + ": " + item.ip + " | Port#: " + item.port + " | userName: " + item.userName);
       });
       prev = "--list";
     }
     if (input.startsWith("--connect")) {
-      console.log(args[1]);
       //check if IP address is valid 
       if(!isIP(args[1]))
         return console.log('Invalid IP');
@@ -318,8 +321,9 @@ function client() {
       //check if its me
       if(destId == user.id)
         return console.log({error: 'Connection to oneself, aborted'});
-      if(room != '')
-        return console.log({error: 'You must terminate connection with user before connecting to new user'});
+      //check if destination id is inside list of connections
+      if(isInRoomList(destId, rooms))
+        return console.log({error: 'Already Connected to user'});
       //find the id of the user based off the ip address and port #
       console.log('connecting to user...');
       //set the destination socket id as a global to connect via a room
@@ -335,14 +339,16 @@ function client() {
         if(response.status == 'ok'){
           //set connected room to variable
           room = response.room.peerId;
+          //push connection into new set of rooms
+          rooms.push(response.room.peerId);
           console.log({success: 'Connected with socket (id): ' + room});
         }
       });
     }
     if(input.startsWith('--terminate')){
       //if you have not made a connection to someone, return, you dont need to do anything here
-      if(room == '')
-        return console.log('No one way connection exists');
+      //if(room == '')
+      //  return console.log('No one way connection exists');
       //we know we are connected to someone at the moment
       let terminateUser = {};
       //if the user used --list command before this one
@@ -356,18 +362,22 @@ function client() {
       terminateUser = users[termIndex - 1];
       if(terminateUser.id == user.id)
         return console.log('Invalid id: this is your port, you cannot remove your connection with yourself');
+      //if the selected user is not connected with us, then abort
+      if(!isInRoomList(terminateUser.id, rooms))
+        return console.log({error: 'You are not connected with this person, therefore cannot be terminated'});
       //all inputs are valid, terminate connection with user
       socket.emit('terminate', {
         id: user.id,
         destId: terminateUser.id
       },(response)=>{
         //if we get an okay message, we disconnected from the room, set room variable to nothing
-        if(response.status == 'ok'){
-          room = '';
-          console.log('Disconnected from user');
-        }
+        if(response.status != 'ok')
+          return console.log({error: 'Could not disconnect from user'});
+        //we must have gotten an ok response
+        rooms = removeRoom(response.roomName, rooms); 
+        console.log('Disconnected from user');
       });
-      destination = "";
+      //destination = "";
     }
     //when ar user exits
     if(input.startsWith('exit')){
@@ -379,8 +389,12 @@ function client() {
           id: user.id,
           destId: room
         },(response)=>{
-          if(response.status == 'ok')
-            console.log('Disconnected from connected user!');  
+          if(response.status != 'ok')
+            return console.log({error: 'Could not disconnect the connection'});  
+          //for sure went successful
+          console.log('Disconnected from connected user!');  
+          //remove the connected room from the user
+          rooms = removeRoom(response.roomName,rooms);
         });
       }
       console.log('Terminating Process');
@@ -389,6 +403,25 @@ function client() {
     }
   });
 }
+
+//check if user is connected to someone
+function isInRoomList(roomName, rooms){
+  for(let i = 0; i < rooms.length; i++){
+    //if we find the target room,then return true
+    if(roomName == rooms[i])
+      return true;
+  }
+  return false;
+}
+
+//remove room
+function removeRoom(roomName, rooms){
+  rooms = rooms.filter((item)=>{
+    return item != roomName;
+  });
+  return rooms;
+}
+
 
 //regex for checking ip address
 function isIP(input) {
