@@ -19,17 +19,17 @@ Dependencies:
 FUNCTIONS:
     NOTE:
         Each argument is separated by a white_space
-    --help
+    --help (Sergio)
         Display help.txt which is a document with helpful information regarding how to operate this application
-    --myip
+    --myip (Sergio)
         Give back the user their IP address they are connected on
-    --myport
+    --myport (Sergio)
         Give back the user their port they are conencted on
     chat <message> (Joshua)
         Sends message to everyone in the server
     --connect <destination (IP address)> <port no>
         Creates a new connection at the specified <destination> and <port no>.   
-    --list
+    --list 
         Creates a table for the client to see who is connected to the server
     --terminate <connection ID> (Joshua)
         Terminates a connection given the connection ID
@@ -64,3 +64,9 @@ Example of running application
              |     \--|
              |      \-|
          <conn ID>  <msg>
+
+
+
+
+# Youtube video structure
+    1. 
